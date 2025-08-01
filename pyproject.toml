@@ -1,0 +1,16 @@
+[build-system]
+requires = ["py-build-cmake~=0.4.3"]
+build-backend = "py_build_cmake.build"
+
+[project]
+name = "esp32_zephyr_api"
+version = "0.1.0"
+description = "API for communication with ESP32 Zephyr application"
+authors = [{name="Iliya Iliev", email="iliyailiev3592@gmail.com"}]
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Ubuntu 24.00",
+]
