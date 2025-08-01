@@ -27,54 +27,32 @@ class Esp32API:
         self.protocol = protocol.lower()
         self.addr = (address, port)
 
-        self.sock_init_hndlr = {
-            "tcp": self._sock_tcp_init,
-            "udp": self._sock_udp_init
-        }
-        self.socket = self.sock_init_hndlr[protocol]()
-
         self.sock_send_hndlr = {
             "tcp": self._sock_tcp_send,
             "udp": self._sock_udp_send
         }
 
-        self.sock_recv_hndlr = {
-            "tcp": self._sock_tcp_recv,
-            "udp": self._sock_udp_recv
-        }
-
-    def _sock_tcp_init(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(5.0)
-        sock.connect(self.addr)
-        return sock
-
-    def _sock_udp_init(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.settimeout(5.0)
-
-        return sock
-
     def _sock_tcp_send(self, req_raw: bytearray):
-        self.socket.send(req_raw)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(5.0)
+            s.connect(self.addr)
+            s.send(req_raw)
+            try:
+                return s.recv(1024)
+            except socket.timeout:
+                logger.warning("Receive timeout")
+                return None
 
     def _sock_udp_send(self, req_raw: bytearray):
-        self.socket.sendto(req_raw, self.addr)
-
-    def _sock_tcp_recv(self):
-        try:
-            return self.socket.recv(1024)
-        except socket.timeout:
-            logger.warning("Receive timeout")
-            return None
-
-    def _sock_udp_recv(self):
-        try:
-            res, _ = self.socket.recvfrom(1024)
-            return res
-        except socket.timeout:
-            logger.warning("Receive timeout")
-            return None
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(5.0)
+            s.sendto(req_raw, self.addr)
+            try:
+                res_raw, _ = s.recvfrom(1024)
+                return res_raw
+            except socket.timeout:
+                logger.warning("Receive timeout")
+                return None
 
     def send_cmd(self, req: object, req_id: int):
         """
@@ -84,8 +62,7 @@ class Esp32API:
         req.hdr.id = req_id
         req_raw = req.SerializeToString()
         logger.debug(f"--->\n{req}")
-        self.sock_send_hndlr[self.protocol](req_raw)
-        res_raw = self.sock_recv_hndlr[self.protocol]()
+        res_raw = self.sock_send_hndlr[self.protocol](req_raw)
         try:
             res.ParseFromString(res_raw)
             logger.debug(f"<---\n{res}")
@@ -146,7 +123,7 @@ class Esp32API:
 
         return adc_val
 
-    def pwm_chs_get(self, ch: int) -> int:
+    def pwm_chs_get(self) -> int:
         pwm_chs = 0
         req = request()
         res = self.send_cmd(req, PWM_CHS_GET)
@@ -185,3 +162,20 @@ class Esp32API:
                 success = False
 
         return success
+
+    def pwm_periods_get(self) -> dict:
+        pwm_periods_interval = {
+            'min': 0,
+            'max': 0
+        }
+
+        req = request()
+        res = self.send_cmd(req, PWM_PERIOD_INTERVAL_GET)
+        if res is not None:
+            if res.hdr.ret == OK:
+                pwm_periods_interval['min'] = res.pwm_periods_get.period_min
+                pwm_periods_interval['max'] = res.pwm_periods_get.period_min
+            else:
+                logger.error(f"Command failed: ({res.hdr.ret }) {res.hdr.err_msg}")
+
+        return pwm_periods_interval
