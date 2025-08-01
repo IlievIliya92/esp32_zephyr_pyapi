@@ -1,0 +1,3 @@
+[submodule "esp32_zephyr"]
+	path = esp32_zephyr
+	url = https://github.com/IlievIliya92/esp32_zephyr.git
